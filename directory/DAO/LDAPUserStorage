@@ -1,0 +1,86 @@
+import java.io.IOException;
+
+import org.forgerock.opendj.ldap.Connection;
+import org.forgerock.opendj.ldap.Entry;
+import org.forgerock.opendj.ldap.LDAPConnectionFactory;
+import org.forgerock.opendj.ldap.LdapException;
+import org.forgerock.opendj.ldap.LinkedHashMapEntry;
+import org.forgerock.opendj.ldap.SearchScope;
+import org.forgerock.opendj.ldap.responses.SearchResultEntry;
+import org.forgerock.opendj.ldap.responses.SearchResultReference;
+import org.forgerock.opendj.ldif.ConnectionEntryReader;
+import org.forgerock.opendj.ldif.LDIFEntryWriter;
+
+import exception.UserStorageException;
+import model.User;
+ 
+public class LDAPUserStorage implements UserStorage {
+	
+	Connection connection = null;
+	final LDIFEntryWriter writer = new LDIFEntryWriter(System.out);
+
+	public LDAPUserStorage() throws LdapException {
+		LDAPConnectionFactory factory = new LDAPConnectionFactory("db.example.com", 1389);
+		String password = "helloworld";
+		connection = factory.getConnection();
+		connection.bind("cn=directory manager", password.toCharArray());
+	}
+    
+    public void addUser(User user) throws UserStorageException {
+    	String entryDN = "uid=" + user.getUserID() + ",ou=Users,dc=example,dc=com";
+    	Entry entry = (Entry) new LinkedHashMapEntry(entryDN).addAttribute("objectclass", "top").addAttribute("objectclass", "DirectoryUser").addAttribute("uid", user.getUserID()).addAttribute("userPassword", user.getPassword()).addAttribute("directoryUserType", user.getUserType()).addAttribute("givenName", user.getFirstName()).addAttribute("sn", user.getLastName()).addAttribute("mail", user.getEmail());
+    	try {
+			connection.add(entry);
+		} catch (LdapException e) {
+			e.printStackTrace();
+		}
+    }
+    
+    public void getDataLDAP() throws IOException {
+    	String baseDN = "ou=Users,dc=example,dc=com";
+		final ConnectionEntryReader reader = connection.search(baseDN, SearchScope.WHOLE_SUBTREE, "(objectClass=DirectoryUser)");
+		while (reader.hasNext()) {
+			if (!reader.isReference()) {
+				final SearchResultEntry entry = reader.readEntry();
+				writer.writeEntry(entry);
+			}
+			else {
+				final SearchResultReference ref = reader.readReference();
+				
+				writer.writeComment((CharSequence) ref.getURIs());
+			}
+		}
+		writer.flush();
+	}
+    
+    public void removeUsers(String userID) throws UserStorageException {
+    	String deleteDN = "uid=" + userID + ",ou=Users,dc=example,dc=com";
+    	try {
+			connection.delete(deleteDN);
+		} catch (LdapException e) {
+			e.printStackTrace();
+		}
+    }
+
+	public boolean doesUserExist(String userID) throws UserStorageException {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+
+	public User authenticateUser(String userID, String password) throws UserStorageException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public String getData() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public User[] listUser() throws UserStorageException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+    
+}
